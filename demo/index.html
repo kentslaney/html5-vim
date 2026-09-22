@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>html5-vim</title>
+<style>
+  :root { --bg: #fbfaf7; --fg: #1d1d1b; --mute: #6b6a66; --line: #d9d6cf; --accent: #2f6f4f; --sel: #cfe3d6 }
+  @media (prefers-color-scheme: dark) { :root { --bg: #181816; --fg: #e8e6e1; --mute: #9a988f; --line: #34332f; --accent: #7fc19c; --sel: #2e4a3a } }
+  * { box-sizing: border-box }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif }
+  main { max-width: 52rem; margin: 0 auto; padding: 2rem 1rem }
+  h1 { font-size: 1.4rem; margin: 0 0 .25rem }
+  p { color: var(--mute); margin: 0 0 1.25rem }
+  textarea { display: block; width: 100%; height: 22rem; padding: .75rem; resize: vertical; border: 1px solid var(--line); border-radius: 6px 6px 0 0;
+    background: transparent; color: inherit; font: 15px/1.6 ui-monospace, Menlo, Consolas, monospace; outline: none }
+  textarea::selection { background: var(--sel) }
+  textarea[data-vim=normal] { caret-color: var(--accent) }
+  #status { display: flex; gap: 1rem; padding: .3rem .75rem; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 6px 6px;
+    font: 13px ui-monospace, Menlo, monospace; color: var(--mute); min-height: 2em }
+  #mode { color: var(--accent); font-weight: 600; text-transform: uppercase; min-width: 6ch }
+  #msg { margin-left: auto; color: var(--fg) }
+  label { color: var(--mute); margin-right: 1rem; font-size: 14px }
+  .controls { margin: .75rem 0 1.5rem }
+  table { border-collapse: collapse; width: 100%; font-size: 14px }
+  td { border-top: 1px solid var(--line); padding: .35rem .5rem; vertical-align: top }
+  td:first-child { color: var(--mute); white-space: nowrap; width: 8rem }
+  code { font: 13px ui-monospace, Menlo, monospace }
+</style>
+</head>
+<body>
+<main>
+  <h1>html5-vim</h1>
+  <p>Vim keybindings on a native <code>&lt;textarea&gt;</code>. Click in and press keys. Starts in normal mode.</p>
+  <textarea id="ed" spellcheck="false">Shall I compare thee to a summer's day?
+Thou art more lovely and more temperate:
+Rough winds do shake the darling buds of May,
+And summer's lease hath all too short a date;
+
+Sometime too hot the eye of heaven shines,
+And often is his gold complexion dimm'd;
+And every fair from fair sometime declines,
+By chance or nature's changing course untrimm'd;
+
+function greet(name) {
+    return "hello, " + name + " (" + [1, 2, 3].join(", ") + ")"
+}</textarea>
+  <div id="status"><span id="mode"></span><span id="keys"></span><span id="msg"></span></div>
+  <div class="controls">
+    <label><input type="checkbox" id="on" checked> enabled</label>
+    <label><input type="checkbox" id="block" checked> block cursor</label>
+    <label><input type="checkbox" id="clip"> yank to clipboard</label>
+  </div>
+  <table>
+    <tr><td>motions</td><td><code>h j k l w W b B e E ge 0 ^ $ gg G f F t T ; , % { } gj gk + - * # n N &lt;C-d&gt; &lt;C-u&gt;</code></td></tr>
+    <tr><td>operators</td><td><code>d c y &gt; &lt; g~ gu gU</code> with a count and a motion, doubled (<code>dd</code>), or on a visual selection</td></tr>
+    <tr><td>text objects</td><td><code>iw aw iW aW ip ap i" a" i' a' i` a` i( a( ib i[ i{ iB i&lt;</code></td></tr>
+    <tr><td>editing</td><td><code>i a I A o O x X s S C D Y r J gJ ~ p P u &lt;C-r&gt; .</code> and registers <code>"a</code>–<code>"z</code>, <code>"A</code> appends, <code>"+</code> is the system clipboard</td></tr>
+    <tr><td>visual</td><td><code>v V o gv</code>, then an operator, <code>r</code>, <code>J</code>, <code>p</code> or <code>:</code></td></tr>
+    <tr><td>command line</td><td><code>/pat ?pat :N :[range]s/pat/rep/[gi] :[range]d :[range]y</code>. Add your own with <code>commands</code>; try <code>:w</code> here</td></tr>
+    <tr><td>leave insert</td><td><code>Esc</code> or <code>Ctrl-[</code></td></tr>
+  </table>
+</main>
+<script type="module" src="demo.js"></script>
+</body>
+</html>

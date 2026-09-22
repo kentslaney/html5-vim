@@ -1,0 +1,29 @@
+{
+  "name": "html5-vim",
+  "version": "0.1.0",
+  "description": "Vim keybindings for plain <textarea> elements. Keeps the native textarea, has no dependencies, and ships unbuilt ES modules.",
+  "keywords": ["vim", "textarea", "keybindings", "editor", "monospace"],
+  "license": "MIT",
+  "author": "Kent Slaney",
+  "repository": "github:kentslaney/html5-vim",
+  "type": "module",
+  "main": "./dist/html5-vim.cjs",
+  "module": "./src/index.js",
+  "unpkg": "./dist/html5-vim.min.js",
+  "exports": {
+    ".": { "import": "./src/index.js", "require": "./dist/html5-vim.cjs" },
+    "./vim": "./src/vim.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["src", "dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --serve",
+    "test": "node --test",
+    "prepack": "npm test && npm run build"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
