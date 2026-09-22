@@ -75,12 +75,14 @@ export function attach(el, opts = {}) {
   }
   const place = () => {
     if (!cursor || !vim) return
-    if (vim.mode !== 'normal' && vim.mode !== 'cmd' || !focused()) {
+    if (vim.mode === 'insert' || !focused()) {
       cursor.style.display = 'none'
       el.style.caretColor = ''
       return
     }
-    const s = getComputedStyle(el), r = el.getBoundingClientRect(), b = caretBox(el, vim.pos)
+    // In visual mode it marks the moving end of the selection; line-wise, the line it's on.
+    const at = vim.mode === 'vline' ? vim.ls(vim.pos) : vim.pos
+    const s = getComputedStyle(el), r = el.getBoundingClientRect(), b = caretBox(el, at)
     const x = b.x - el.scrollLeft, y = b.y - el.scrollTop, top = parseFloat(s.borderTopWidth)
     const under = style === 'behind' || style === 'auto' && /^(transparent|rgba\(0, 0, 0, 0\))$/.test(s.backgroundColor)
     el.style.caretColor = 'transparent'

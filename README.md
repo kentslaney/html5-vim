@@ -59,7 +59,9 @@ or `dist/html5-vim.min.js`, which exposes the global `html5vim.attach`.
 The block cursor is its own element (`.vim-cursor`, fixed-position, `pointer-events: none`),
 measured with a hidden mirror of the textarea's text, so it lands on the right character
 through wrapping, scrolling and resizes. That leaves the native selection to visual mode
-alone, and the native caret is hidden with `caret-color` while in normal mode.
+alone, and the native caret is hidden with `caret-color` while vim is in control. In
+visual mode the cursor stays on, marking the moving end of the selection (`o` flips it);
+line-wise, it sits at the start of the active line.
 
 The textarea gets `data-vim="normal|insert|visual|vline|cmd"` and emits the `vim:status`
 and `vim:command` events. `vim:command` is cancelable; it fires for unknown ex
