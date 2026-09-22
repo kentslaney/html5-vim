@@ -49,11 +49,17 @@ or `dist/html5-vim.min.js`, which exposes the global `html5vim.attach`.
 | option | default | |
 |---|---|---|
 | `mode` | `'normal'` | starting mode (`'insert'` also works) |
-| `block` | `true` | in normal mode the cursor is a one-character selection; set `false` for a plain caret and style `textarea[data-vim=normal]` yourself |
+| `cursor` | `'auto'` | how the normal-mode block cursor is drawn: `'behind'` puts a positioned element under the textarea, so the transparent textarea lets the text paint over it; `'over'` puts it on top and inverts the character; `'auto'` picks `behind` when the textarea's background is transparent; `'selection'` selects the character instead; `'none'` leaves the native caret |
+| `cursorColor` | | fill for that element (default: a 30% wash of the text color, or solid in `'over'` mode) |
 | `indent` | 4 spaces | what `>>` inserts |
 | `clipboard` | `false` | copy every yank to the system clipboard (`"+y` always does) |
 | `commands` | `{}` | `:name args` handlers `(args, vim) => string \| void \| false`; a returned string is shown as the message |
 | `onStatus` | | `({ mode, keys, cmd, msg }) => …` after every key |
+
+The block cursor is its own element (`.vim-cursor`, fixed-position, `pointer-events: none`),
+measured with a hidden mirror of the textarea's text, so it lands on the right character
+through wrapping, scrolling and resizes. That leaves the native selection to visual mode
+alone, and the native caret is hidden with `caret-color` while in normal mode.
 
 The textarea gets `data-vim="normal|insert|visual|vline|cmd"` and emits the `vim:status`
 and `vim:command` events. `vim:command` is cancelable; it fires for unknown ex

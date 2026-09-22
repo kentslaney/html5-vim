@@ -12,10 +12,10 @@ const opts = {
 let vim = attach(ed, opts)
 const rebind = () => {
   vim?.detach()
-  vim = $('on').checked ? attach(ed, { ...opts, block: $('block').checked, clipboard: $('clip').checked }) : null
+  vim = $('on').checked ? attach(ed, { ...opts, cursor: $('cursor').value, clipboard: $('clip').checked }) : null
   if (!vim) $('mode').textContent = $('keys').textContent = ''
   ed.focus()
 }
-for (const id of ['on', 'block', 'clip']) $(id).addEventListener('change', rebind)
+for (const id of ['on', 'cursor', 'clip']) $(id).addEventListener('change', rebind)
 ed.focus()
 ed.setSelectionRange(0, 0)

@@ -1,13 +1,15 @@
 // dist/: esm + cjs + iife (global `html5vim`). site/: static demo (GitHub Pages ready).
 import * as esbuild from 'esbuild'
-import { cpSync, rmSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 
 const lib = { entryPoints: ['src/index.js'], bundle: true, minify: true, sourcemap: true, target: 'es2022' }
 const site = { entryPoints: ['demo/demo.js'], bundle: true, minify: true, outdir: 'site', target: 'es2022' }
 
-rmSync('dist', { recursive: true, force: true })
-rmSync('site', { recursive: true, force: true })
-cpSync('demo/index.html', 'site/index.html')
+const clean = d => { try { rmSync(d, { recursive: true, force: true }) } catch {} } // stale output only
+clean('dist')
+clean('site')
+mkdirSync('site', { recursive: true })
+writeFileSync('site/index.html', readFileSync('demo/index.html')) // overwrite in place
 
 if (process.argv.includes('--serve')) {
   const ctx = await esbuild.context(site)

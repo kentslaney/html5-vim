@@ -4,7 +4,35 @@ const IGNORE = /^(Shift|Control|Alt|AltGraph|Meta|CapsLock|NumLock|ScrollLock|Fn
 const ARROWS = { ArrowLeft: 'h', ArrowRight: 'l', ArrowUp: 'k', ArrowDown: 'j', Home: '0', End: '$' }
 const INPUTS = { insertLineBreak: 'Enter', insertParagraph: 'Enter', deleteContentBackward: 'Backspace' }
 
-let ctx
+// Styles the caret mirror has to share with the textarea to lay text out the same way.
+const MIRROR = ['boxSizing', 'width', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+  'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'fontStyle', 'fontVariant', 'fontWeight',
+  'fontStretch', 'fontSize', 'fontFamily', 'lineHeight', 'letterSpacing', 'wordSpacing', 'textIndent',
+  'textTransform', 'whiteSpace', 'wordBreak', 'overflowWrap', 'tabSize', 'direction']
+
+let ctx, mirror
+/** Where the character at `pos` sits inside the textarea's border box. */
+const caretBox = (el, pos) => {
+  const s = getComputedStyle(el)
+  if (!mirror) {
+    mirror = document.body.appendChild(document.createElement('div'))
+    Object.assign(mirror.style, { position: 'absolute', top: '0', left: '-9999px', visibility: 'hidden' })
+    mirror.setAttribute('aria-hidden', 'true')
+  }
+  for (const k of MIRROR) mirror.style[k] = s[k]
+  mirror.textContent = el.value.slice(0, pos)
+  const span = mirror.appendChild(document.createElement('span'))
+  const ch = el.value[pos]
+  span.textContent = ch === undefined || ch === '\n' ? ' ' : ch
+  const fs = parseFloat(s.fontSize)
+  let lh = parseFloat(s.lineHeight) || 1.2
+  if (lh < fs / 2) lh *= fs // unitless line-height
+  const h = Math.min(lh, fs * 1.35)
+  const box = { x: span.offsetLeft, y: span.offsetTop + span.offsetHeight / 2 - h / 2, w: span.offsetWidth, h }
+  mirror.textContent = ''
+  return box
+}
+
 const width = (el, text) => {
   const s = getComputedStyle(el)
   ctx ??= document.createElement('canvas').getContext('2d')
@@ -19,7 +47,13 @@ export const isMonospace = el => Math.abs(width(el, 'i'.repeat(10)) - width(el, 
  * Bind vim keys to a <textarea> (or text <input>). Returns the Vim instance,
  * with `.detach()` to unbind. Options:
  *   mode: 'normal' | 'insert'   initial mode (default 'normal')
- *   block: boolean              one-char selection as a block cursor (default true)
+ *   cursor:                     how the normal-mode block cursor is drawn (default 'auto')
+ *     'behind'    a positioned element under the (transparent) textarea, so text paints over it
+ *     'over'      the same element on top, inverting the character it covers
+ *     'auto'      'behind' when the textarea's background is transparent, else 'over'
+ *     'selection' select the character instead, with no extra element
+ *     'none'      leave the native caret alone
+ *   cursorColor: string         fill for the cursor element (default: a wash of the text color)
  *   indent: string              what >> inserts (default 4 spaces)
  *   clipboard: boolean          mirror every yank to the system clipboard
  *   commands: { name(args, vim) }  extra :ex commands; return a string to show it,
@@ -30,6 +64,33 @@ export const isMonospace = el => Math.abs(width(el, 'i'.repeat(10)) - width(el, 
 export function attach(el, opts = {}) {
   if (el.vim) return el.vim
   const focused = () => el.getRootNode().activeElement === el
+  const style = opts.cursor ?? 'auto'
+  let vim
+  // The cursor is its own element so the selection stays free for visual mode.
+  const cursor = style === 'selection' || style === 'none' ? null : document.createElement('div')
+  if (cursor) {
+    cursor.className = 'vim-cursor'
+    Object.assign(cursor.style, { position: 'fixed', display: 'none', pointerEvents: 'none' })
+    document.body.appendChild(cursor)
+  }
+  const place = () => {
+    if (!cursor || !vim) return
+    if (vim.mode !== 'normal' && vim.mode !== 'cmd' || !focused()) {
+      cursor.style.display = 'none'
+      el.style.caretColor = ''
+      return
+    }
+    const s = getComputedStyle(el), r = el.getBoundingClientRect(), b = caretBox(el, vim.pos)
+    const x = b.x - el.scrollLeft, y = b.y - el.scrollTop, top = parseFloat(s.borderTopWidth)
+    const under = style === 'behind' || style === 'auto' && /^(transparent|rgba\(0, 0, 0, 0\))$/.test(s.backgroundColor)
+    el.style.caretColor = 'transparent'
+    Object.assign(cursor.style, {
+      display: y + b.h < top || y > top + el.clientHeight ? 'none' : 'block', // scrolled out of view
+      left: `${r.left + x}px`, top: `${r.top + y}px`, width: `${b.w}px`, height: `${b.h}px`,
+      color: s.color, zIndex: under ? '-1' : '2147483000', mixBlendMode: under ? 'normal' : 'difference',
+      background: opts.cursorColor ?? (under ? 'color-mix(in srgb, currentColor 30%, transparent)' : 'currentColor'),
+    })
+  }
   const host = {
     get text() { return el.value },
     get sel() { return [el.selectionStart, el.selectionEnd] },
@@ -64,11 +125,12 @@ export function attach(el, opts = {}) {
     },
     emit(s) {
       el.dataset.vim = s.mode
+      place()
       opts.onStatus?.(s)
       el.dispatchEvent(new CustomEvent('vim:status', { bubbles: true, detail: s }))
     },
   }
-  const vim = new Vim(host, opts)
+  vim = new Vim(host, { ...opts, block: style === 'selection' })
   const cmdish = () => vim.mode === 'insert' || vim.mode === 'cmd'
 
   const keydown = e => {
@@ -90,12 +152,29 @@ export function attach(el, opts = {}) {
   }
   const settle = () => setTimeout(() => { if (!cmdish()) { vim.sync(); vim.render() } })
 
+  // The cursor is positioned in viewport coordinates, so anything that moves the
+  // textarea moves it too: page or container scrolling, resizes, font loads.
+  const observer = cursor && new ResizeObserver(place)
   el.addEventListener('keydown', keydown)
   el.addEventListener('beforeinput', beforeinput)
   el.addEventListener('mouseup', settle)
   el.addEventListener('focus', settle)
+  el.addEventListener('blur', place)
+  el.addEventListener('scroll', place, { passive: true })
+  addEventListener('scroll', place, { capture: true, passive: true })
+  addEventListener('resize', place)
+  observer?.observe(el)
+  document.fonts?.ready.then(place)
   el.dataset.vim = vim.mode
+  place()
   vim.detach = () => {
+    observer?.disconnect()
+    cursor?.remove()
+    el.style.caretColor = ''
+    el.removeEventListener('blur', place)
+    el.removeEventListener('scroll', place)
+    removeEventListener('scroll', place, { capture: true })
+    removeEventListener('resize', place)
     el.removeEventListener('keydown', keydown)
     el.removeEventListener('beforeinput', beforeinput)
     el.removeEventListener('mouseup', settle)
