@@ -40,6 +40,9 @@ const cases = [
   ['ab|c\nabcdef', '$j', 'abc\nabcde|f'],
   ['|1\n2\n3', 'G', '1\n2\n|3'],
   ['1\n2\n|3', '2G', '1\n|2\n3'],
+  ['|a\nb\nc\nd\ne', 'L', 'a\nb\nc\nd\n|e'],       // no host viewport: falls back to the buffer
+  ['|a\nb\nc\nd\ne', 'M', 'a\nb\n|c\nd\ne'],
+  ['a\nb\nc\nd\n|e', 'H', '|a\nb\nc\nd\ne'],
   ['|aaaa bbbb cccc', 'gj', 'aaaa bbbb |cccc'],
   ['aaaa bbbb |cccc', 'gk', '|aaaa bbbb cccc'],
   ['|foo bar foo', '/foo<CR>', 'foo bar |foo'],
@@ -136,4 +139,25 @@ test('ex commands reach the host', () => {
   for (const k of ':w out.txt') v.feed(k)
   v.feed('Enter')
   assert.deepEqual(got, ['w', 'out.txt'])
+})
+
+test('H, M and L use the host viewport; z commands ask it to scroll', () => {
+  const revealed = []
+  const h = {
+    text: 'l0\nl1\nl2\nl3\nl4\nl5\nl6', s: 0, e: 0,
+    get sel() { return [this.s, this.e] },
+    select(s, e) { this.s = s; this.e = e },
+    edit() {},
+    screenPos: w => ({ top: 9, middle: 15, bottom: 18 })[w], // lines 3, 5, 6
+    reveal: (pos, align) => revealed.push([pos, align]),
+  }
+  const v = new Vim(h)
+  const at = keys => { for (const k of keys) v.feed(k); return v.pos }
+  assert.equal(at('H'), 9)
+  assert.equal(at('L'), 18)
+  assert.equal(at('M'), 15)
+  assert.equal(at('2H'), 12) // second line from the top of the screen
+  assert.equal(at('2L'), 15)
+  at('zz'); at('zt'); at('zb')
+  assert.deepEqual(revealed, [[15, 'center'], [15, 'top'], [15, 'bottom']])
 })

@@ -115,7 +115,13 @@ export class Vim {
     if (k[0] === '"') { R.next(); reg = R.next() }
     const n1 = R.num(), n = n1 || 1
     let c = R.next()
-    if (c === 'g') c += R.next()
+    if (c === 'g' || c === 'z') c += R.next()
+    if (c[0] === 'z') { // scroll the cursor line: center, top, bottom
+      const align = { zz: 'center', 'z.': 'center', zt: 'top', zEnter: 'top', zb: 'bottom', 'z-': 'bottom' }[c]
+      if (!align) fail()
+      this.host.reveal?.(this.pos, align)
+      return
+    }
     if (this.mode === 'visual' || this.mode === 'vline') return this.visual(c, n, n1, reg, R)
     if (OPS.has(c)) return this.operate(c, n1, reg, R, null, k)
     if (c in ALIAS) return this.operate(ALIAS[c][0], n1, reg, R, ALIAS[c][1], k)
@@ -240,6 +246,11 @@ export class Vim {
         return { to: this.fnb(this.lineFrom(p, m === '-' ? -n : m === '_' ? n - 1 : n)), line: true }
       case 'G': case 'gg':
         return { to: this.fnb(has ? this.lineFrom(0, n - 1) : m === 'G' ? this.ls(len) : 0), line: true }
+      case 'H': case 'M': case 'L': { // screen top / middle / bottom, buffer ends without a view
+        const at = this.host.screenPos?.(m === 'H' ? 'top' : m === 'L' ? 'bottom' : 'middle')
+          ?? (m === 'H' ? 0 : m === 'L' ? this.ls(len) : this.lineFrom(0, this.lineOf(len) >> 1))
+        return { to: this.fnb(this.lineFrom(at, m === 'L' ? 1 - n : m === 'H' ? n - 1 : 0)), line: true }
+      }
       case 'w': case 'W': case 'e': case 'E': case 'b': case 'B': case 'ge': case 'gE': {
         const big = /[WEB]$/.test(m), C = i => kind(v[i], big)
         const blank = i => v[i] === '\n' && v[i - 1] === '\n'

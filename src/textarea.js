@@ -73,16 +73,60 @@ export function attach(el, opts = {}) {
     Object.assign(cursor.style, { position: 'fixed', display: 'none', pointerEvents: 'none' })
     document.body.appendChild(cursor)
   }
-  const place = () => {
-    if (!cursor || !vim) return
-    if (vim.mode === 'insert' || !focused()) {
-      cursor.style.display = 'none'
+  // Every scroll box between the caret and the viewport, innermost first.
+  const scrollers = () => {
+    const out = []
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const cs = getComputedStyle(p)
+      if (/auto|scroll|overlay/.test(cs.overflowY + cs.overflowX) &&
+        (p.scrollHeight > p.clientHeight || p.scrollWidth > p.clientWidth)) out.push(p)
+    }
+    return [...out, null] // null: the window
+  }
+  // Scroll the caret into view the way the browser does for the native one.
+  const revealBox = (b, align) => {
+    const s = getComputedStyle(el)
+    // Scroll the textarea's own box first, as the browser does even when overflow is hidden;
+    // a textarea sized to its content (lyrics-editor) has none, so the page scrolls instead.
+    if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth) {
+      const y = b.y - parseFloat(s.borderTopWidth), x = b.x - parseFloat(s.borderLeftWidth)
+      const vh = el.clientHeight, vw = el.clientWidth
+      el.scrollTop = align === 'center' ? y - (vh - b.h) / 2 : align === 'top' ? y
+        : align === 'bottom' ? y - vh + b.h : Math.min(Math.max(el.scrollTop, y + b.h - vh), y)
+      el.scrollLeft = Math.min(Math.max(el.scrollLeft, x + b.w - vw), x)
+      align = 'auto' // an explicit alignment applies to the caret's own scroll box only
+    }
+    const r = el.getBoundingClientRect()
+    let top = r.top + b.y - el.scrollTop, left = r.left + b.x - el.scrollLeft
+    for (const p of scrollers()) {
+      const v = p ? p.getBoundingClientRect() : { top: 0, left: 0, bottom: innerHeight, right: innerWidth }
+      const vh = v.bottom - v.top
+      const dy = align === 'auto' ? Math.min(0, top - v.top) + Math.max(0, top + b.h - v.bottom)
+        : top - v.top - (align === 'center' ? (vh - b.h) / 2 : align === 'bottom' ? vh - b.h : 0)
+      const dx = Math.min(0, left - v.left) + Math.max(0, left + b.w - v.right)
+      if (dx || dy) { // clamped at the ends, so measure what actually moved
+        const [x0, y0] = p ? [p.scrollLeft, p.scrollTop] : [scrollX, scrollY]
+        if (p) p.scrollLeft += dx, p.scrollTop += dy
+        else scrollBy(dx, dy)
+        left -= (p ? p.scrollLeft : scrollX) - x0
+        top -= (p ? p.scrollTop : scrollY) - y0
+      }
+      align = 'auto'
+    }
+  }
+  const place = (reveal) => {
+    if (!vim) return
+    if (vim.mode === 'insert' || !focused()) { // the browser scrolls for the native caret
+      if (cursor) cursor.style.display = 'none'
       el.style.caretColor = ''
       return
     }
     // In visual mode it marks the moving end of the selection; line-wise, the line it's on.
     const at = vim.mode === 'vline' ? vim.ls(vim.pos) : vim.pos
-    const s = getComputedStyle(el), r = el.getBoundingClientRect(), b = caretBox(el, at)
+    const b = caretBox(el, at) // content coordinates: unaffected by scrolling
+    if (reveal) revealBox(b, 'auto')
+    if (!cursor) return
+    const s = getComputedStyle(el), r = el.getBoundingClientRect()
     const x = b.x - el.scrollLeft, y = b.y - el.scrollTop, top = parseFloat(s.borderTopWidth)
     const under = style === 'behind' || style === 'auto' && /^(transparent|rgba\(0, 0, 0, 0\))$/.test(s.backgroundColor)
     el.style.caretColor = 'transparent'
@@ -125,9 +169,25 @@ export function attach(el, opts = {}) {
       el.dispatchEvent(ev)
       return ev.defaultPrevented && (detail.message ?? true)
     },
+    reveal(pos, align) { revealBox(caretBox(el, pos), align); place(false) },
+    /** Buffer position on the top / middle / bottom visible line, for H, M and L. */
+    screenPos(where) {
+      const s = getComputedStyle(el), r = el.getBoundingClientRect(), bt = parseFloat(s.borderTopWidth)
+      const top = Math.max(r.top + bt, 0), bottom = Math.min(r.top + bt + el.clientHeight, innerHeight)
+      const y = where === 'top' ? top : where === 'bottom' ? bottom : (top + bottom) / 2
+      const target = y - r.top + el.scrollTop
+      let lo = 0, hi = el.value.length // caretBox().y only grows with pos
+      if (where === 'top') { // first line starting at or below the top edge
+        while (lo < hi) { const mid = (lo + hi) >> 1; if (caretBox(el, mid).y >= target) hi = mid; else lo = mid + 1 }
+        return lo
+      }
+      const limit = where === 'bottom' ? target - caretBox(el, 0).h : target // last line fully in view
+      while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (caretBox(el, mid).y <= limit) lo = mid; else hi = mid - 1 }
+      return lo
+    },
     emit(s) {
       el.dataset.vim = s.mode
-      place()
+      place(true)
       opts.onStatus?.(s)
       el.dispatchEvent(new CustomEvent('vim:status', { bubbles: true, detail: s }))
     },
@@ -156,27 +216,28 @@ export function attach(el, opts = {}) {
 
   // The cursor is positioned in viewport coordinates, so anything that moves the
   // textarea moves it too: page or container scrolling, resizes, font loads.
-  const observer = cursor && new ResizeObserver(place)
+  const redraw = () => place(false) // never scrolls: these fire *because* something moved
+  const observer = cursor && new ResizeObserver(redraw)
   el.addEventListener('keydown', keydown)
   el.addEventListener('beforeinput', beforeinput)
   el.addEventListener('mouseup', settle)
   el.addEventListener('focus', settle)
-  el.addEventListener('blur', place)
-  el.addEventListener('scroll', place, { passive: true })
-  addEventListener('scroll', place, { capture: true, passive: true })
-  addEventListener('resize', place)
+  el.addEventListener('blur', redraw)
+  el.addEventListener('scroll', redraw, { passive: true })
+  addEventListener('scroll', redraw, { capture: true, passive: true })
+  addEventListener('resize', redraw)
   observer?.observe(el)
-  document.fonts?.ready.then(place)
+  document.fonts?.ready.then(redraw)
   el.dataset.vim = vim.mode
-  place()
+  redraw()
   vim.detach = () => {
     observer?.disconnect()
     cursor?.remove()
     el.style.caretColor = ''
-    el.removeEventListener('blur', place)
-    el.removeEventListener('scroll', place)
-    removeEventListener('scroll', place, { capture: true })
-    removeEventListener('resize', place)
+    el.removeEventListener('blur', redraw)
+    el.removeEventListener('scroll', redraw)
+    removeEventListener('scroll', redraw, { capture: true })
+    removeEventListener('resize', redraw)
     el.removeEventListener('keydown', keydown)
     el.removeEventListener('beforeinput', beforeinput)
     el.removeEventListener('mouseup', settle)

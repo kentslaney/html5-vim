@@ -83,13 +83,18 @@ commands, so `:w` can be wired up with `preventDefault()`.
 
 ## Supported
 
-- **motions** `h j k l w W b B e E ge gE 0 ^ $ gg G f F t T ; , % { } + - _ gj gk * # n N <C-d> <C-u>`. Arrow keys and Home/End map to motions.
+- **motions** `h j k l w W b B e E ge gE 0 ^ $ gg G H M L f F t T ; , % { } + - _ gj gk * # n N <C-d> <C-u>`. Arrow keys and Home/End map to motions.
 - **operators** `d c y > < g~ gu gU`, with counts, doubled (`dd`, `gUU`), or in visual mode
 - **text objects** `iw aw iW aW ip ap` quotes `" ' \`` brackets `( ) b [ ] { } B < >`
 - **edits** `i a I A gI o O x X s S C D Y r J gJ ~ p P u <C-r> .`, count-repeated inserts, and auto-indent on `o`/`O`
 - **registers** `"a`–`"z`, `"A` appends, `"_` discards, `"+`/`"*` use the system clipboard
 - **visual** `v V o gv` plus operators, `r`, `J`, `p`, and `:'<,'>`
+- **scrolling** the cursor is kept in view as it moves, scrolling the textarea, any scrollable ancestor, or the page — whichever holds it. `zz`, `zt`, `zb` (and `z.`, `z<CR>`, `z-`) put the cursor line in the middle, at the top, or at the bottom.
 - **command line** `/ ?` search (smartcase, JS regex, `\<` `\>`), `:N`, `:[range]s/pat/rep/[g]` (`&`, `\1`, `\n`), `:[range]d`, `:[range]y`
+
+`H`, `M` and `L` go to the top, middle and bottom lines actually on screen, measured the
+same way as the cursor; with no view to measure (the engine used on its own) they fall
+back to the first, middle and last lines of the buffer.
 
 `gj`/`gk` move by *display* line. They need monospace text: the wrap points come from
 the textarea's width divided by the character width.
