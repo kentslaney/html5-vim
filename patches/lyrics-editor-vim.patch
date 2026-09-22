@@ -1,0 +1,17 @@
+diff --git a/lyrics-editor/index.html b/lyrics-editor/index.html
+index 3fd6f3b..438e5ac 100644
+--- a/lyrics-editor/index.html
++++ b/lyrics-editor/index.html
+@@ -11,6 +11,12 @@
+ "></script>
+ <script type="text/javascript" src="g2p/beam.js"></script>
+ <script type="text/javascript" src="index.js"></script>
++<script type="module">
++    // vim keybindings: html5-vim is this submodule's parent repo
++    import { attach } from "../src/index.js"
++    addEventListener("load", () => attach(
++        document.getElementsByClassName("foreground")[0], { cursor: "behind" }))
++</script>
+ </head>
+ <body>
+     <div class="double-spaced">

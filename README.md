@@ -11,6 +11,20 @@ npm run build   # dist/ (esm, cjs, iife) + site/ (static demo)
 npm test
 ```
 
+`site/` also gets the `lyrics-editor` submodule, copied in and patched with
+`patches/lyrics-editor-vim.patch`, which adds one module script to its `index.html`:
+
+```js
+import { attach } from "../src/index.js"
+addEventListener("load", () => attach(
+    document.getElementsByClassName("foreground")[0], { cursor: "behind" }))
+```
+
+The submodule itself is never modified — the patch is applied to the copy under
+`site/`, next to a copy of `src/`, so `../src/index.js` resolves the same way it does in
+this repo. If the editor's `index.html` drifts and `git apply` fails, regenerate the
+patch. The step is skipped when the submodule isn't checked out.
+
 ## Use
 
 ```js
