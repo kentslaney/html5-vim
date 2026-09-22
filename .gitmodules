@@ -1,0 +1,3 @@
+[submodule "lyrics-editor"]
+	path = lyrics-editor
+	url = git@github.com:kentslaney/lyrics-editor.git
